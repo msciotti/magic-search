@@ -50,12 +50,12 @@ async function handleRequest(request: Request) {
         minValue = kvp['min'];
         maxValue = kvp ['max'];
 
-        if (minValue < 1) {
+        if (minValue < 0) {
           const response = JSON.stringify({
             type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
             data: {              
               flags: InteractionResponseFlags.EPHEMERAL,
-              content: 'Min must be larger than 1'
+              content: 'Min must be less than or equal to 0'
             }
           });
           return new Response(response, { headers: { 'Content-type': 'application/json '}});

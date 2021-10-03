@@ -1,0 +1,7 @@
+dist
+node_modules
+transpiled
+worker
+wrangler.toml
+.cargo-ok
+.prettierrc

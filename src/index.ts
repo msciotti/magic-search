@@ -1,158 +1,127 @@
-import { handleRequest } from './handler';
 import { InteractionResponseFlags, InteractionResponseType, InteractionType, verifyKey } from 'discord-interactions';
 
 addEventListener('fetch', (event) => {
   event.respondWith(handleRequest(event.request))
 })
 
-async function handleRequest(request: Request) {
+function optionsToObject(options: Array<any> | null): any {
+  if (options == null) {
+    return {};
+  }
+
+  return options.reduce((x, y) => ({ ...x, [y.name]: y.value }), {});
+}
+
+async function handleRequest(request: Request): Promise<Response> {
   const signature = request.headers.get('X-Signature-Ed25519');
   const timestamp = request.headers.get('X-Signature-Timestamp');
-  const requestTwo = request.clone();
-  const rawBody = await request.text();
-  const isValidRequest = verifyKey(rawBody, signature, timestamp, 'MY_PUBLIC_KEY');
+  const rawBody = await request.clone().text();
+  //@ts-ignore
+  const isValidRequest = verifyKey(rawBody, signature, timestamp, DISCORD_PUBLIC_KEY);
+  let response;
 
   if (!isValidRequest) {
-    return new Response('Invalid signture', {status:401});
+    return new Response('Invalid signture', { status: 401 });
   }
 
-  
-  else {
-    const json = await requestTwo.json();
-    if (json.type === InteractionType.PING) {
-      const response = JSON.stringify({
-        type: InteractionResponseType.PONG
+  const json = await request.json();
+
+  if (json.type === InteractionType.PING) {
+    const response = JSON.stringify({
+      type: InteractionResponseType.PONG
+    });
+    return new Response(response);
+  }
+
+  if (json.type === InteractionType.APPLICATION_COMMAND) {
+    const kvp = optionsToObject(json.data.options);
+    const scryfallResponse = await fetch(`https://api.scryfall.com/cards/${kvp['card']}`);
+    const scryfallJson = await scryfallResponse.json();
+
+    response = {
+      type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+      data: {
+        content: scryfallJson['image_uris']['border_crop']
+      }
+    }
+
+    return new Response(JSON.stringify(response), {
+      headers: {
+        'Content-type': 'application/json'
+      }
+    })
+  }
+
+  if (json.type === 4) {
+    if (json.data.name === 'search') {
+      const kvp = optionsToObject(json.data.options);
+
+      if (kvp['card'] === '') {
+        response = {
+          type: 8,
+          data: {
+            choices: []
+          }
+        }
+        return new Response(JSON.stringify(response), {
+          headers: {
+            'Content-type': 'application/json'
+          }
+        });
+      }
+
+      const scryfallResponse = await fetch(`https://api.scryfall.com/cards/search?q=${kvp['card']}`);
+      const scryfallJson = await scryfallResponse.json();
+
+      if (scryfallJson['status'] === 404) {
+        response = {
+          type: 8,
+          data: {
+            choices: []
+          }
+        }
+        return new Response(JSON.stringify(response), {
+          headers: {
+            'Content-type': 'application/json'
+          }
+        });
+      }
+
+      let responseArray = scryfallJson['data'].map((card: any) => {
+        return {
+          name: card['name'],
+          value: card['id']
+        }
       });
-      return new Response(response);
-    }
 
-    if (json.type === 3) {
-      if (json.data.custom_id === "test-dropdown") {
-        const response = JSON.stringify({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content: 'Thanks for applying!',
-            flags: InteractionResponseFlags.EPHEMERAL
-          }
-        });
-        return new Response(response, {
-          headers: {
-            'Content-type': 'application/json'
-          }
-        });
-      }
-    }
+      responseArray = responseArray.slice(0, 25);
 
-    if (json.type === InteractionType.APPLICATION_COMMAND) {
-      if (json.data.name === 'dropdown') {
-        let minValue, maxValue;
-        const kvp = optionsToObject(json.data.options);
-        minValue = kvp['min'];
-        maxValue = kvp ['max'];
-
-        if (minValue < 0) {
-          const response = JSON.stringify({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: {              
-              flags: InteractionResponseFlags.EPHEMERAL,
-              content: 'Min must be less than or equal to 0'
-            }
-          });
-          return new Response(response, { headers: { 'Content-type': 'application/json '}});
+      response = {
+        type: 8,
+        data: {
+          choices: responseArray
         }
-
-        if (maxValue > 3) {
-          const response = JSON.stringify({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: {
-              flags: InteractionResponseFlags.EPHEMERAL,
-              content: 'Choose a max less than 3. I didn\'t have enough time to make more things.'
-            }
-          });
-          return new Response(response, { headers: { 'Content-type': 'application/json '}});
-        }
-
-        if (minValue > maxValue) {
-          const response = JSON.stringify({
-            type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-            data: {
-              flags: InteractionResponseFlags.EPHEMERAL,
-              content: 'Bruh.'
-            }
-          });
-          return new Response(response, { headers: { 'Content-type': 'application/json '}});
-        }        
-
-        const response = JSON.stringify({
-          type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
-          data: {
-            content: 'Mason is looking for new arena partners. What classes do you play?',
-            "components": [
-              {
-                "type": 1,
-                "components": [{
-                    "type": 3,
-                    "custom_id": "test-dropdown",
-                    "options": EXAMPLE_VALUES,
-                    "placeholder": "Choose a class",
-                    "min_values": minValue,
-                    "max_values": maxValue
-                }]
-              }   
-            ]
-          }
-        });
-        return new Response(response, {
-          headers: {
-            'Content-type': 'application/json'
-          }
-        });
       }
+      return new Response(JSON.stringify(response), {
+        headers: {
+          'Content-type': 'application/json'
+        }
+      });
     }
   }
+
+  response = {
+    type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
+    data: {
+      flags: InteractionResponseFlags.EPHEMERAL,
+      content: 'Nothing'
+    }
+  };
+
+  return new Response(JSON.stringify(response), {
+    headers: {
+      'Content-type': 'application/json'
+    }
+  });
 }
 
-const EXAMPLE_VALUES = [
-  {
-    'label': 'Rogue',
-    'value': 'rogue',
-    'description': 'Sneak n stab',
-    'emoji': {
-      'name': 'rogue',
-      'id': '625891304148303894'
-    }
-  },
-  {
-    'label': 'Mage',
-    'value': 'mage',
-    'description': 'Turn \'em into a sheep',
-    'emoji': {
-      'name': 'mage',
-      'id': '625891304081063986'
-    }
-  },
-  {
-    'label': 'Priest',
-    'value': 'priest',
-    'description': 'You get heals when I\'m done doing damage',
-    'emoji': {
-      'name': 'priest',
-      'id': '625891303795982337'
-    }
-  }
-]
-
-type InteractionOption = {
-  name: string,
-  value: number
-}
-
-function optionsToObject(options: Array<InteractionOption> | null): any {
-  if (options == null) {
-    return {
-      min: 1,
-      max: 1
-    }
-  }
-  return options.reduce((x, y) => ({...x, [y.name]: y.value}), {});
-}

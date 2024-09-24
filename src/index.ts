@@ -35,15 +35,22 @@ async function handleRequest(request: Request): Promise<Response> {
 
   if (json.type === InteractionType.APPLICATION_COMMAND) {
     const kvp = optionsToObject(json.data.options);
-    const scryfallResponse = await fetch(`https://api.scryfall.com/cards/${kvp['card']}`);
+    const scryfallResponse = await fetch(`https://api.scryfall.com/cards/${kvp['card']}`, {
+      headers: {
+        'User-Agent': 'MagicSearchDiscordApp/1.0',
+        'Accept': 'application/json'
+      }
+    });
     const scryfallJson = await scryfallResponse.json();
+
+    const imageUrl = scryfallJson['image_uris']['border_crop'];
 
     response = {
       type: InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE,
       data: {
-        content: scryfallJson['image_uris']['border_crop']
+        content: imageUrl
       }
-    }
+    };
 
     return new Response(JSON.stringify(response), {
       headers: {
@@ -70,7 +77,12 @@ async function handleRequest(request: Request): Promise<Response> {
         });
       }
 
-      const scryfallResponse = await fetch(`https://api.scryfall.com/cards/search?q=${kvp['card']}`);
+      const scryfallResponse = await fetch(`https://api.scryfall.com/cards/search?q=${kvp['card']}`, {
+        headers: {
+          'User-Agent': 'MagicSearchDiscordApp/1.0',
+          'Accept': 'application/json'
+        }
+      });
       const scryfallJson = await scryfallResponse.json();
 
       if (scryfallJson['status'] === 404) {

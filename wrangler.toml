@@ -1,7 +1,13 @@
-type = "webpack"
-zone_id = ""
-account_id = "MY_ACCOUNT_ID"
-route = ""
+account_id = "af0012b153e06441ffcfa92ff0af2b79"
 workers_dev = true
-webpack_config = "webpack.config.js"
-name = "interactions-test"
+name = "magic-search"
+compatibility_date = "2024-09-24"
+main = "src/index.ts"
+
+[vars]
+# Default/development variables
+ENVIRONMENT = "development"
+
+[env.production]
+name = "magic-search"
+vars = { ENVIRONMENT = "production" }

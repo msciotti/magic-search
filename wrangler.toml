@@ -4,6 +4,10 @@ name = "magic-search"
 compatibility_date = "2024-09-24"
 main = "src/index.ts"
 
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [vars]
 # Default/development variables
 ENVIRONMENT = "development"
